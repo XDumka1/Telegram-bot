@@ -1,33 +1,27 @@
-import logging
-from telegram import Update
-from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
+import telebot
+import os
+from config import TOKEN
 
-# Включаем логирование
-logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
-logger = logging.getLogger(__name__)
+bot = telebot.TeleBot(TOKEN)
 
-# Токен вашего бота
-TOKEN = 'ТОКЕН ВАШЕГО БОТА'
+@bot.message_handler(commands=['start'])
+def handle_start(message):
+    bot.send_message(message.chat.id, "Привет, я бот для улучшения качества фото. Отправьте фото для работы с ним")
 
-# Команда /start
-async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user = update.effective_user
-    await update.message.reply_text(f"Привет, {user.first_name}! Я твой бот.")
-
-# Ответ на текстовые сообщения
-async def echo(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text(update.message.text)
-
-def main():
-    # Создаем приложение
-    application = Application.builder().token(TOKEN).build()
+@bot.message_handler(content_types=['photo'])
+def handle_photo(message):
+    user_id = message.from_user.id
+    user_folder = str(user_id)
     
-    # Регистрируем обработчики
-    application.add_handler(CommandHandler("start", start))
-    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, echo))
+    if not os.path.exists(user_folder):
+        os.makedirs(user_folder)
     
-    # Запускаем бота
-    application.run_polling(allowed_updates=Update.ALL_TYPES)
+    photo = message.photo[-1]
+    file_info = bot.get_file(photo.file_id)
+    downloaded_file = bot.download_file(file_info.file_path)
+    save_path = os.path.join(user_folder, 'photo.jpg')
+    with open(save_path, 'wb') as new_file:
+        new_file.write(downloaded_file)
+    bot.reply_to(message, 'Фотография сохранена.')
 
-if __name__ == '__main__':
-    main()
+bot.polling()
